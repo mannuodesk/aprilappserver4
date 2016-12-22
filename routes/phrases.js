@@ -4,6 +4,8 @@ var mongoose= require('mongoose');
 var Phrases = require('./../models/Phrases');
 var UrlUtility = require('./../Utility/UrlUtility');
 var Response = require('./../dto/APIResponse');
+var PhraseGroup = require('./../models/PhraseGroup');
+var Block = require('./../models/Block');
 
  //GET home page. 
 router.get('/', function(req, res, next) {
@@ -33,8 +35,10 @@ postPhrasesRoute.post(function(req, res) {
     var response = new Response();
     var date = new Date();
     // Set the beer properties that came from the POST data
-    phrases.phraseText = req.body.phraseText;
-    phrases._blockId = req.body._blockId;
+    var phrase = req.body.phraseText;
+    phrases.phraseText = phrase.toLowerCase();
+    phrases.phrase = req.body.phraseText;
+    phrases._phraseGroupId = req.body._phraseGroupId;
     phrases.createdOnUTC = date;
     phrases.updatedOnUTC = date;
     phrases.isDeleted = false; 
@@ -57,22 +61,67 @@ postPhrasesRoute.post(function(req, res) {
 getAllPhrasesRoute.get(function (req, res) {
     // Create a new instance of the Beer model
     var response = new Response();
-    // Save the beer and check for errors
-    
-    Phrases.find({}, null, { sort: { '_id': -1 } }, function (err, phrases) {
+    var groupsArray = [];
+    var array = [];
+    var groupsBlockDto = {
+        'phraseGroup':PhraseGroup,
+        'phrases':[],
+        'block':Block
+    };       
+    PhraseGroup.find({}, null, { sort: { 'order': -1 } }, function (err, PhraseGroups) {
         if (err)
         {
             res.send(err);
         }
         else
         {
-            response.message = "Success";
-            response.code = 200;
-            response.data = phrases;
-            res.json(response);
+            for(var i = 0; i< PhraseGroups.length; i++)
+            {
+                groupsBlockDto = {
+                    'phraseGroup':PhraseGroup,
+                    'phrases':[],
+                    'block':Block
+                };     
+                groupsBlockDto.phraseGroup = PhraseGroups[i];
+                var phraseGroupsId = PhraseGroups[i]._id;
+                console.log(phraseGroupsId);
+                var counter = 0;
+                array.push(groupsBlockDto);
+                Phrases.find({_phraseGroupId: phraseGroupsId}, function (err, phrases) {
+                    if (err)
+                    {
+                        res.send(err);
+                    }
+                    else
+                    {
+                        console.log(phrases);
+                        if(phrases.length != 0)
+                        {
+                            array[counter].phrases = phrases;
+                        }
+                        else
+                        {
+                            array[counter].phrases = [];
+                        }
+                        counter = counter + 1;
+                        if(counter == i)
+                        {
+                            response.message = "Success";
+                            response.code = 200;
+                            response.data = array;
+                            res.json(response);
+                        }
+                    }
+                });
+                
+            }
+            if(PhraseGroups.length == 0)
+            {
+                response.message = "Failure";
+                response.code = 400;
+                res.json(response);
+            }
         }
-    });
+    }).populate('_blockId');;
 });
 module.exports = router;
-
-
